@@ -1,0 +1,65 @@
+# DAP (Dynamics Aware Predictor) — MNIST training configuration
+
+# ── Pretrained checkpoints ────────────────────────────────────────────────────
+pretrained:
+  cdiff_ckpt: /path/to/score_network.pt       # pretrained VP-SDE score network
+  f_uni_ckpt: /path/to/f_uni_classifier.pt    # pretrained universal classifier F_uni
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+data:
+  h5_path:    /path/to/mnist_data.h5           # HDF5 with data/x, data/y, split/{trn,val}_idx
+  n_classes:  10
+
+# ── Reverse SDE ───────────────────────────────────────────────────────────────
+sde:
+  n_steps: 200        # Euler-Maruyama discretization steps
+  eps:     0.001      # minimum time (numerical stability)
+
+# ── Trajectories ──────────────────────────────────────────────────────────────
+trajectories:
+  n_train: 300        # diffusion trajectories used for DAP training
+  n_eval:  500        # diffusion trajectories used for CE/accuracy evaluation
+
+# ── Reference dataset D_s ─────────────────────────────────────────────────────
+# Labeled subset used for the boundary supervision term.
+d_s:
+  n_samples: 1000     # total samples, drawn stratified across present classes
+
+# ── DAP architecture ──────────────────────────────────────────────────────────
+dap:
+  in_ch:         1
+  chs:           [32, 64]
+  hdims:         []           # no hidden layer in head (linear probe on conv features)
+  n_classes:     10
+  temb_dim:      256
+  fourier_scale: 30.0
+  dropout:       0.0
+  t_mode:        addbias      # 'addbias' or 'concat'
+
+# ── Training hyperparameters ──────────────────────────────────────────────────
+train:
+  n_steps:       25000
+  batch_size:    1024
+  lr:            1.0e-4
+  log_interval:  5000
+
+  # Boundary loss: CE( DAP(x_ref, σ_min),  one-hot y_ref )
+  w_boundary: 1.0
+
+  # Intermediate loss  CE( p_target(x_{t-1}),  DAP(x_t, σ_t) )
+  w_interior: 0.001
+
+  # EMA target network
+  use_ema_target: true
+  ema_tau:        0.99        # = 1 - 1/window_size  (window_size = 100)
+
+# ── Hardware ──────────────────────────────────────────────────────────────────
+device: cuda
+dtype:  float32
+
+# ── Reproducibility ───────────────────────────────────────────────────────────
+seed: 42
+
+# ── Output ────────────────────────────────────────────────────────────────────
+output_dir:       results/dap
+save_checkpoint:  true
